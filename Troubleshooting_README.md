@@ -109,9 +109,9 @@ Now we have everything we need to rerun the OptiType command, independent of the
 ```
 # Copy the files that are needed to rerun the tool
 
-gsutil cp gs://[GCS BUCKET]/cromwell-executions/immuno/[WORKFLOW ID]/call-somaticExome/somaticExome/[UNIQUE SUB WORKFLOW ID 1]/call-tumorIndexCram/tumor.cram .
+gcloud storage cp gs://[GCS BUCKET]/cromwell-executions/immuno/[WORKFLOW ID]/call-somaticExome/somaticExome/[UNIQUE SUB WORKFLOW ID 1]/call-tumorIndexCram/tumor.cram .
 
-gsutil cp gs://[GCS REFERENCE FILES BUCKET]/human_GRCh38_ens105/aligner_indices/bwamem2_2.2.1/all_sequences.fa .
+gcloud storage cp gs://[GCS REFERENCE FILES BUCKET]/human_GRCh38_ens105/aligner_indices/bwamem2_2.2.1/all_sequences.fa .
 
 # Enter an interactive Docker
 
