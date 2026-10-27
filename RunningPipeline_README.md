@@ -14,7 +14,7 @@ local system and cloud resources will be cleaned up.
 Some steps are run within docker containers. It therefore requires that you can run interactive docker sessions on your system.
 
 You will interact with the Google Cloud in several ways:
-1. From the local system using command line tools, including `gcloud` and `gsutil`.
+1. From the local system using command line tools, such as  `gcloud`.
 2. We will create a Google Virtual Machine (VM) and start a Cromwell service on it. You will then login to this VM and perform some commands and monitor workflow progress there. Cromwell on this VM will orchestrate the creation and use of many additional worker VMs that complete all the compute heavy tasks of the workflow.
 3. The Google Cloud Console in your web browser may be used to visualize/monitor the usage of cloud resources. In the Console, you will see the most relevant resources in the "Cloud Storage" and "Compute Engine" sections.
 
@@ -219,7 +219,7 @@ gcloud config set compute/zone us-central1-c
 ```
 
 ### Interacting with Google buckets from your local system
-Note that, if needed, you can use the following docker image to access `gsutil` for exploration of your google storage: `docker(google/cloud-sdk)`. Or alternatively, you can install the Google Cloud SDK on your system. The following instructions assume the latter.
+Note that, if needed, you can use the following docker image to access `gcloud storage` for exploration of your google storage: `docker(google/cloud-sdk)`. Or alternatively, you can install the Google Cloud SDK on your system. The following instructions assume the latter.
 
 ## Step-by-step instructions
 Start by opening a Terminal session on your local system
@@ -302,9 +302,10 @@ rm -f Exome_Norm.tar Exome_Tumor.tar RNAseq_Tumor.tar
 You may either make a set of reference files using instructions provided in the `Preparing_references.md` document. If you want to use our group's references, you can make a copy of a bundle of reference files from our Public ("Requestor Pays") Google Bucket to your own Google Bucket as follows:
 
 ```bash
-gsutil -u $GCS_PROJECT ls gs://griffith-lab-workflow-inputs/
-gsutil -u $GCS_PROJECT cp -r gs://griffith-lab-workflow-inputs/human_GRCh38_ens105 $GCS_BUCKET_PATH/human_GRCh38_ens105
-gsutil ls $GCS_BUCKET_PATH/human_GRCh38_ens105
+gcloud storage ls gs://griffith-lab-workflow-inputs/ --billing-project=[Google Project]
+gcloud storage cp -r gs://griffith-lab-workflow-inputs/human_GRCh38_ens105 $GCS_BUCKET_PATH/human_GRCh38_ens105 --billing-project=[Google Project]
+
+gcloud storage ls $GCS_BUCKET_PATH/human_GRCh38_ens105
 ```
 
 ### Obtain an example configuration (YAML) file on local system
@@ -380,7 +381,7 @@ First **on your local system**, copy your cloudized YAML file to the Google buck
 
 ```bash
 cd $WORKING_BASE/yamls/
-gsutil cp $CLOUD_YAML $GCS_BUCKET_PATH/yamls/$CLOUD_YAML
+gcloud storage cp $CLOUD_YAML $GCS_BUCKET_PATH/yamls/$CLOUD_YAML
 ```
 
 Now log into Google Cromwell VM instance again and copy the YAML file from the Google bucket to the VM.
@@ -390,7 +391,7 @@ gcloud compute ssh $GCS_INSTANCE_NAME
 export GCS_BUCKET_PATH=gs://test-immuno-pipeline
 export CLOUD_YAML=hcc1395_immuno_cloud-WDL.yaml
 
-gsutil cp $GCS_BUCKET_PATH/yamls/$CLOUD_YAML .
+gcloud storage cp $GCS_BUCKET_PATH/yamls/$CLOUD_YAML .
 
 ``` 
 
@@ -435,7 +436,7 @@ First determine your WORKFLOW_ID if it was not recorded previously. This can be 
 
 ```bash
 export GCS_BUCKET_PATH=gs://test-immuno-pipeline
-gsutil ls $GCS_BUCKET_PATH/cromwell-executions/immuno/
+gcloud storage ls $GCS_BUCKET_PATH/cromwell-executions/immuno/
 
 journalctl -u cromwell | tail | grep "Workflow actor"
 ```
@@ -455,7 +456,7 @@ $GCS_BUCKET_PATH/workflow_artifacts/$WORKFLOW_ID/outputs.json
 
 Confirm that they were successfully transferred and logout of the Cromwell VM on GCP:
 ```bash
-gsutil ls $GCS_BUCKET_PATH/workflow_artifacts/$WORKFLOW_ID
+gcloud storage ls $GCS_BUCKET_PATH/workflow_artifacts/$WORKFLOW_ID
 exit
 ```
 
@@ -510,7 +511,7 @@ Use the following command to destroy the Cromwell VM.
 gcloud compute instances delete $GCS_INSTANCE_NAME
 ```
 
-You can empty the cloud bucket either in the Web Console or using commands like `gsutil rm -r $GCS_BUCKET_PATH/folder-name`.
+You can empty the cloud bucket either in the Web Console or using commands like `gcloud storage rm -r $GCS_BUCKET_PATH/folder-name`.
 
 Finally, we recommend you perform a survey of Cloud Storage and Compute Engine sections in the Google Cloud Web Console to make sure everything has been cleaned up successfully.
 
