@@ -262,7 +262,7 @@ git clone https://github.com/griffithlab/ImmunoNX_protocol.git
 
 git clone --branch v1.4.0 https://github.com/wustl-oncology/analysis-wdls.git
 
-git clone --branch v1.4.8 https://github.com/wustl-oncology/cloud-workflows.git
+git clone --branch v1.7.4 https://github.com/wustl-oncology/cloud-workflows.git
 ```
 
 ### Login to GCP and set the desired project
