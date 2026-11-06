@@ -262,7 +262,7 @@ git clone https://github.com/griffithlab/ImmunoNX_protocol.git
 
 git clone --branch v1.4.0 https://github.com/wustl-oncology/analysis-wdls.git
 
-git clone --branch v1.7.4 https://github.com/wustl-oncology/cloud-workflows.git
+git clone --branch v1.8.1 https://github.com/wustl-oncology/cloud-workflows.git
 ```
 
 ### Login to GCP and set the desired project
@@ -331,11 +331,11 @@ If you are modifying this tutorial to work with your own data, you will need to 
 
 The reference and annotation files should already be in your Google Bucket. However, the input FASTQ data files are still only on your local system, so we need to upload them and update our YAML file to point to their new locations on the cloud.
 
-Start an interactive docker session capable of running the "cloudize" scripts. Note that the following docker command uses `--env` commands to pass some convenient environment variables in that were exported above. The first `-v` option is used to allow access to where the data is stored. The second `-v` is used to expose the location of the Google Cloud Credential files.  You will need to update this to reflect your username. The `-it` option is used to make the session interactive and helps us drop into a `/bin/bash` session. The `mgibio/cloudize-workflow:latest` docker image has the helper scripts we need to upload files to the Google Bucket and make the new YAML file.
+Start an interactive docker session capable of running the "cloudize" scripts. Note that the following docker command uses `--env` commands to pass some convenient environment variables in that were exported above. The first `-v` option is used to allow access to where the data is stored. The second `-v` is used to expose the location of the Google Cloud Credential files.  You will need to update this to reflect your username. The `-it` option is used to make the session interactive and helps us drop into a `/bin/bash` session. The `mgibio/cloudize-workflow:v1.8.1` docker image has the helper scripts we need to upload files to the Google Bucket and make the new YAML file.
 
 ```bash
-docker pull mgibio/cloudize-workflow:latest
-docker run -it --env GCS_PROJECT --env GCS_BUCKET_NAME --env GCS_BUCKET_PATH --env GCS_INSTANCE_NAME --env GCS_SERVICE_ACCOUNT --env WORKING_BASE --env WORKFLOW_DEFINITION --env LOCAL_YAML --env CLOUD_YAML -v $PWD:$PWD -v ~/.config/gcloud:/root/.config/gcloud mgibio/cloudize-workflow:latest /bin/bash
+docker pull mgibio/cloudize-workflow:v1.8.1
+docker run -it --env GCS_PROJECT --env GCS_BUCKET_NAME --env GCS_BUCKET_PATH --env GCS_INSTANCE_NAME --env GCS_SERVICE_ACCOUNT --env WORKING_BASE --env WORKFLOW_DEFINITION --env LOCAL_YAML --env CLOUD_YAML -v $PWD:$PWD -v ~/.config/gcloud:/root/.config/gcloud mgibio/cloudize-workflow:1.8.1 /bin/bash
 ```
 
 Attempt to cloudize your workflow and inputs by running the python script in this docker image.
