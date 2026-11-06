@@ -30,7 +30,7 @@ Run the YAML checker script as follows (we suggest doing this right before start
 
 ```bash
 
-docker run -it --env HOME --env GCS_CASE_NAME -v $HOME/:$HOME/ -v /shared/:/shared/ -v $HOME/.config/gcloud:/root/.config/gcloud mgibio/cloudize-workflow:latest /bin/bash
+docker run -it --env HOME --env GCS_CASE_NAME -v $HOME/:$HOME/ -v /shared/:/shared/ -v $HOME/.config/gcloud:/root/.config/gcloud mgibio/cloudize-workflow:1.8.1 /bin/bash
 
 cd $HOME/yamls
 
