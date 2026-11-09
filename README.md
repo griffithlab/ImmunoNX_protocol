@@ -8,7 +8,7 @@ This repository contains the protocol and supporting materials for the ImmunoNX 
 
 Link to the manuscript: [arXiv preprint](https://arxiv.org/pdf/2512.08226)
 
-Link to supplementary files: [Zenodo](https://zenodo.org/records/17862140)
+Link to supplementary files: [Zenodo](https://doi.org/10.5281/zenodo.17809276)
 
 ## Repository Contents
 
