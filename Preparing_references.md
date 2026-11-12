@@ -1,7 +1,10 @@
 # Preparing References README
 
-There are dozens of input files needed for these pipelines.  These include things like reference genomes, aligner indices, gene annotations, and known variants.   This guide aims to be a comprehensive walkthrough of where to find those files and/or how to create them. Code snippets are included for human build GRCh38 and Ensembl version 113. 
-
+There are dozens of input files needed for these pipelines.  These include things 
+like reference genomes, aligner indices, gene annotations, and known variants.   
+This guide aims to be a comprehensive walkthrough of where to find those files and/or 
+how to create them. Code snippets are included for human build GRCh38 and Ensembl 
+version 113 as an example. 
 
 Before running any snippets, make a directory where you'd like this cache to be stored, and set the `BASEDIR` variable to point to it:
 
@@ -12,7 +15,9 @@ BASEDIR=/path/to/annotation_data_grch38_ens113
 ## Reference genome 
 #### fasta 
 
-We will use the 1000 Genomes version of the human GRCh38 build. This reference includes extra decoy and HLA sequences in addition to the alternate haplotypes provided from the GRC consortium. 
+We will use the 1000 Genomes version of the human GRCh38 build. This reference includes 
+extra decoy and HLA sequences in addition to the alternate haplotypes provided from 
+the GRC consortium. 
 
 ```
 mkdir -p $BASEDIR/reference_genome
@@ -39,7 +44,7 @@ java -jar /opt/picard/picard.jar CreateSequenceDictionary R=$BASEDIR/reference_g
 
 #### Ensembl Synonyms file
 
-We will download the chromAlias file from UCSC genome browser and restrict it to lines in Ensembl
+Download the chromAlias file from UCSC genome browser and restrict it to lines in Ensembl
 
 ```
 wget -O $BASEDIR/reference_genome/chromAlias.txt.gz https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/chromAlias.txt.gz
@@ -62,7 +67,7 @@ zip -r $BASEDIR/vep_cache.zip $BASEDIR/vep_cache
 If for some reason the desired cache version and docker image version in use do not match, add `--CACHE_VERSION <version>`
 
 #### Genes/Transcripts GTF 
-
+A definition of the reference transcriptome (based on the same coordinate system/build as the reference genome) is used for multiple purposes throughout the analysis. The version of transcript annotations (e.g. Ensembl v113) should be used everywhere that transcript annotations or sequences are needed.
 
 ```
 mkdir -p $BASEDIR/rna_seq_annotation
@@ -97,6 +102,8 @@ cat $BASEDIR/rna_seq_annotation/Homo_sapiens.GRCh38.cdna.all.fa.gz $BASEDIR/rna_
 
 #### bwa mem index 
 
+The human genome reference sequence must be indexed for efficient searching by the bwa-mem alignment algorithm. This index should be created by the same version of bwa-mem that will be used for alignment. 
+
 From docker image: `mgibio/alignment_helper-cwl:2.1.1`
 
 ```
@@ -110,7 +117,9 @@ bwa-mem2 index all_sequences.fa
 
 
 #### STAR-fusion index 
- In the `trinityctat/starfusion` docker container:
+A custom bundle of reference sequences and annotations for use with STAR-fusion may be prepared as follows. 
+
+In the `trinityctat/starfusion` docker container:
 
 ```
 mkdir -p $BASEDIR/aligner_indices/star_fusion/temp 
@@ -123,7 +132,6 @@ cd $BASEDIR/aligner_indices/star_fusion/temp
 ## Known Variants
 
 #### Known snps and indels 
-
 
 dbSNP/indels from the Mills/1000G/etc datasets for use with GATK/Mutect
 from the `google/cloud-sdk` image:
@@ -150,7 +158,6 @@ wget -O $BASEDIR/known_variants/docm.vcf.gz.tbi https://github.com/evelyn-schmid
 
 
 #### Gnomad population frequencies 
-
 
 This command downloads the V3 of the genome [Gnomad Database](https://gnomad.broadinstitute.org) which has the allele frequencies from 70k WGS samples aligned to GRCh38. This file is ~236gb.
 
@@ -182,7 +189,7 @@ cp $BASEDIR/known_variants/gnomad_temp/gnomad_b38_exome.vcf.gz* $BASEDIR/known_v
 
 
 #### Common SNPs for somalier concordance 
-
+A reference list of known human polymorphisms is used to performing genotype concordance between sequence data from different samples (e.g. tumor vs normal) to ensure they both correspond to the same patient (i.e. a check for sample mixups).
 
 ```
 wget -O $BASEDIR/known_variants/somalier_GRCh38.vcf.gz https://github.com/brentp/somalier/files/3412456/sites.hg38.vcf.gz
@@ -203,7 +210,7 @@ kallisto index -i $BASEDIR/rna_seq_annotation/Homo_sapiens.GRCh38.cdna.ncrna.fa.
 
 
 #### Kallisto gene translation table 
-
+The following is used to aggregate transcript expression estimates from Kallisto to the gene level.
 
 From docker image `quay.io/biocontainers/bioconductor-biomart:2.62.0--r44hdfd78af_0`
 
@@ -223,7 +230,7 @@ gtfToGenePred -genePredExt -geneNameAsName2 -ignoreGroupsWithoutExons $BASEDIR/r
 
 
 #### Ribosomal genes for QC 
-
+Ribosomal genes will be used to quantify the effectiveness of ribo-reduction procedures used during RNA-seq library preparation.
 
 ```
 cat $BASEDIR/reference_genome/all_sequences.dict >$BASEDIR/rna_seq_annotation/Homo_sapiens.GRCh38.113.ribo_intervals
@@ -244,7 +251,7 @@ cp /opt/agfusiondb/agfusion.homo_sapiens.113.db .
 ## Other
 
 #### Illumina adapters 
-
+Obtain Illumina adapter sequences which are used for read trimming.
 
 ```
 mkdir $BASEDIR/miscellaneous
@@ -256,7 +263,6 @@ wget -O illumina_multiplex.fa https://github.com/evelyn-schmidt/immuno_gcp_wdl_m
 #### QC annotation files 
 
 
-
 ```
 cd $BASEDIR/aligner_indices/biscuit_0.3.8
 wget http://zwdzwd.io/BISCUITqc/hg38_QC_assets.zip
@@ -265,7 +271,7 @@ unzip hg38_QC_assets.zip
 
 
 #### Capture reagents
-
+Ideally the exome capture regions that correspond to the exome capture reagent used for whole exome sequencing should be obtained from the data provider.  If this is not feasible, the following definition (or a generic one based on all annotated exons) may be used.
 
 ```
 cd $BASEDIR/miscellaneous
@@ -275,6 +281,7 @@ wget -O IDT_xGen_Lockdown_Exome_v1.targets.interval_list https://github.com/evel
 
 
 #### Peptides FASTA file
+A file containing the full protein sequence of every known human protein will be used to screen mutant peptide (neoantigen) candidates for incidental off-target matches to wild type protein sequences. 
 
 ```
 cd $BASEDIR/miscellaneous
