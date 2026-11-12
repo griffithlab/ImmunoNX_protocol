@@ -226,41 +226,42 @@ even though they contributed to a non-zero VAF.
 **DNA VAF**
 
 By definition DNA VAF must be > 0 if a variant was called. The accuracy of a DNA VAF estimate
-depends on the depth of reads covering the variant position.
+largely depends on the depth of reads covering the variant position.
 
 A higher DNA VAF is preferable because it suggests higher tumor clonality. A higher DNA VAF
-can also result if the variant allele has been amplified or is affected by loss-of-heterozygosity
-(LOH). For example, if a heterozygous variant arises in a tumor and the chromosome (or a
-region of it) that harbors the variant is duplicated, this can result in higher DNA VAF. This
-scenario is also desirable from the perspective of neoantigen prioritization.
+can also result if the variant allele has been amplified or is affected by 
+loss-of-heterozygosity (LOH). For example, if a heterozygous variant arises in a tumor and the 
+chromosome (or a region of it) that harbors the variant is duplicated, this can result in higher 
+DNA VAF. This scenario is also desirable from the perspective of neoantigen prioritization.
 
 A lower DNA VAF is less desirable because it could indicate a sub-clonal variant (i.e. one that is
 not present in all the cells of the tumor). Low DNA VAFs are also more likely to be false positive
-somatic variants, although this is dependent on the absolute depth of sequencing achieved. If
+somatic variants, although this is dependent on the absolute depth and quality of sequencing achieved. If
 the sequence error rate of the platform is low, and the depth is high, somatic variants can be
-robustly identified down to low VAFs (e.g. 1-2%). A default conservative threshold for allowing
-somatic variant calls is often set at 5% but may be lowered to 1.5-2.5% in cases where tumor
-purity is low.
+robustly identified down to low VAFs (e.g. 1-2%, or lower with UMI error correction). 
+A default conservative threshold for allowing somatic variant calls is often set at 5% but may be 
+lowered to 1.5-2.5% in cases where tumor purity is low and the data quality is sufficient..
 
 Correct interpretation of individual DNA VAFs generally must consider multiple factors including:
 (a) purity of the tumor (aka tumor cellularity); (b) ploidy of the tumor (e.g. copy number
 gains/losses that may influence VAFs); (c) clonality of the variant; (d) random sampling error. A
-detailed discussion of these interpretations is beyond the scope of this document but many tools
-and publications are available.
+detailed discussion of these interpretations is beyond the scope of this document but many relevant 
+tools and publications are available.
 
 **Tier**
 
 Each neoantigen candidate variant is automatically placed into one of several tiers based on a
 simple heuristic: Pass, LowExpr, NoExpr, SubClonal, Poor, Anchor. The Tier is evaluated for the
-top peptide arising from each variant.
+top peptide arising from each variant. Note that new versions of pVACtools will further classify
+the Poor tier into additional sub-tiers.
 
 If the Tier is Pass, the variant can generally be accepted with limited review. However, there are
 a few issues that may require even a Pass candidate to be rejected including: (a) problematic
 amino acids (e.g. Cysteines, if defined by the user) in the core binding peptide; (b) problematic
 amino acids that are outside the core binding sequence but closely flanking it such that a long
 peptide sequence is not possible (c) reference matches, (d) other issues that come up during genomic review, 
-including that the somatic variant giving rise to the neoantigen is a false
-positive.
+including that the somatic variant giving rise to the neoantigen is a false positive or expression support
+is found to be problematic.
 
 The additional tiers (LowExpr, NoExpr, SubClonal, Poor, Anchor) are designed to draw attention
 to specific areas of consideration during the ITB review or genomics review.
@@ -305,8 +306,6 @@ approach (e.g. using pVACsplice).
 For the most part, neoantigen predictions should correspond to transcripts that have been
 assigned the Biotype “protein_coding” by Ensembl. Additional biotypes (e.g. nonsense mediated
 decay) may result in neoantigen peptide predictions and may be considered (rarely and
-
-
 cautiously) if review of the transcript annotation, RNA-seq data or other data (e.g. Mass
 Spectrometry) suggests the transcript actually does produce protein. It is often helpful to review
 the “transcript table” in Ensembl (see example above in the TSL section).
@@ -360,8 +359,9 @@ marked in red and the substring that matches between all three sequences is unde
 
 The general principle of Reference Match analysis is that we want to avoid the situation where
 the neoepitope sequence presented to the T cell by the Best Peptide could also be presented
-by the reference peptide. Interpretation of this concept is often aided by referring to the Anchor
-Heatmap view in pVACview (see below for more details).
+by a reference peptide (possibly leading to immune tolerance or off-target auto-immunity). 
+Interpretation of this concept is often aided by referring to the Anchor Heatmap view in pVACview 
+(see below for more details).
 
 A known complication of the reference match analysis is that for inframe insertions and
 deletions, the mutant peptide will sometimes be reported as having a reference match to the
@@ -449,6 +449,7 @@ Several types of prediction scores have been described as relevant to pMHC prior
 Included among these are distinct concepts: binding, stability, cleavage, transport, processing
 and immunogenicity. A description of the rationale behind each of these types of algorithms is
 far beyond the scope of this document, but in very simple terms:
+
 - **Binding** (aka binding affinity) algorithms (e.g. NetMHCpan, MHCflurry) directly model the
 binding of a short peptide sequence to the class I/II MHC groove. These algorithms are
 typically trained on in vitro binding data generated by testing individual peptides (from
@@ -460,7 +461,7 @@ percentile rank.
 peptide-MHC complex. While binding prediction models the likelihood that a given peptide
 will bind to a specific MHC molecule, stability prediction models how long a peptide-MHC
 complex remains stable before dissociating.
-- Peptide **cleavage** algorithms (e.g. NetChop) attempt to predict cleavage sites of the
+- Peptide **cleavage** algorithms (e.g. NetChop, NetCleave) attempt to predict cleavage sites of the
 proteasome. These algorithms may be trained on a combination of in vitro protein
 degradation and observed MHC ligands. One goal for the interpretation of these algorithms
 is to address whether a long peptide, upon cleavage at predicted sites, will retain a core
@@ -469,7 +470,7 @@ binding sequence with favorable binding/stability characteristics.
 trained on peptide elution mass spectrometry data and attempt to predict, in aggregate,
 peptides that are bound, stable, cleaved and transported appropriately. While conceptually a
 superior approach compared to binding affinity predictions, training data remains limited for
-some/many HLA alleles.
+some/many HLA alleles and encodes bias fundamental to sample processing and mass spectrometry platforms).
 - **Immunogenicity** prediction algorithms are a rapidly evolving area of neoantigen
 prioritization but are significantly limited by availability of training data. The term
 immunogenicity is used in many ways, and historically has been used in the context of all of
@@ -507,8 +508,6 @@ Example with low inter-algorithm agreement (binding affinities range from ~ 300-
 Processing (aka elution) algorithm scores are discussed briefly above and generally reported on
 a 0-1 scale, with higher numbers indicating a higher probability of being presented. The shape
 of the distribution of these scores varies from algorithm to algorithm so where possible the
-
-
 percentile rank should be considered (e.g. considering a percentile score <2% to be
 acceptable).
 
@@ -516,8 +515,8 @@ acceptable).
 
 Immunogenicity algorithm scores are discussed briefly above and generally reported on a 0-1
 scale, with higher numbers indicating a higher probability of being recognized by a T cell.
-pVACtools currently supports DeepImmuno and BigMHC_IM. DeepImmuno was trained on
-immune validation data from IEDB, but not tumor specific immunogenicity data and
+pVACtools currently supports DeepImmuno and BigMHC_IM (additional algorithms are being added regularly). 
+DeepImmuno was trained on immune validation data from IEDB, but not tumor specific immunogenicity data and
 predictions are available for only lengths 9-10 and a relatively narrow set of HLA alleles
 compared to the binding and presentation algorithms. In general, Immunogenicity prediction
 algorithms are considered to be experimental at this stage.
@@ -553,7 +552,8 @@ acids. While rare, if a frameshift sequence is longer than this before hitting a
 some neoantigen sequences might be missed. Frameshifts should be reviewed to determine
 if a stop codon is reached within the length specified by _- -downstream-sequence-length_.
 - Potential for nonsense mediated decay (NMD). In cases where a frameshift variant is
-predicted to trigger NMD (e.g. > 50 nucleotides upstream of the last exon-exon junction) the candidate may be considered lower priority, particularly if the RNA allele expression for the
+predicted to trigger NMD (e.g. > 50 nucleotides upstream of the last exon-exon junction) the 
+candidate may be considered lower priority, particularly if the RNA allele expression for the
 frameshift variant is low compared to the median VAF of all somatic variants for the tumor.
 - Additional complexity of proximal variant interpretation. In-phase proximal germline or
 somatic variants that occur with the short/long peptide window for a neoantigen candidate
@@ -594,7 +594,7 @@ approaches may consider the first and last few amino acids to be anchoring and t
 the peptide to be TCR facing. A more specific rule of thumb may consider position 2 and the last
 position to be the anchor. The anchor heatmap reflects a more systematic approach where the
 anchor positions were determined empirically and automatically selected based on a cutoff. By
-default the AA positions that contribute 80% of the anchor potential are defined as anchor
+default the AA positions that cumulatively contribute 80% of the anchor potential are defined as anchor
 positions. In practice this means that for each allele 1-4 positions are generally defined as
 anchor positions.
 
@@ -617,10 +617,10 @@ be found in the pVACtools and pVACview documentation.
 > [!NOTE]  
 > See more examples of how to use pVACview for neoantigen candidate review [here](https://pvactools.readthedocs.io/en/latest/pvacview/pvacseq_module/pvacseq_vignette.html)
 
-## Genomics Review (post ITB meeting)
+## Genomics Review (after initial candidate nomination in pVACview)
 
-Once the ITB meeting is complete and the preliminary set of candidates has been nominated, a
-genomics review of all candidates must be completed following the procedures and criteria laid
+Once a pVACview review is complete and the preliminary set of candidates has been nominated, a
+genomics review of all candidates should be completed following the procedures and criteria laid
 out below.
 
 ### Location of Files Needed for Genomics Review
@@ -701,7 +701,7 @@ amplification of the same source DNA fragment).
 `qc/tumor_rna/rna_metrics.pdf`
     - Visually inspect this plot. If the RNA-seq data is of good quality from intact RNA the
     plot should have a “horse back” shape, representing lower coverage at the beginning
-    and end of transcripts but quickly rising and remaining relatively high over the
+    and end of transcripts but quickly rising and remaining relatively high and even over the
     majority of the transcript positions. RNA-seq data made from highly degraded RNA
     combined with polyA selection or oligo-dT cDNA priming can have a heavily biased
     distribution instead. Such data can still produce gene expression estimates but may
@@ -730,7 +730,10 @@ the Immunotherapy Tumor Board will be a small subset of this number.
 Given the reported tumor type do we see evidence for expected somatic driver variants?
 Enumerate these in the report and if there are no plausible driver variants, raise this as a
 possible red flag. This review can be conducted in pVACview with CancerGeneCensus genes
-loaded.
+loaded. However, note that a driver variant can be a nonsense (stop gain) mutation, stop loss,
+splice site mutation or other categories that would not appear in pVACview because they not 
+lead to a tumor specific protein sequence. Review of the full annotated somatic variants 
+table should also be performed.
 
 Other strategies for assessing drivers:
 - Use the variants TSV file and select all variant types that would directly impact protein
@@ -742,35 +745,63 @@ in CBioPortal after selecting studies that match the cancer type of the patient
 
 **HLA allele review for sample/data mixup**
 
-Clinical HLA typing is strongly preferred and, when available, is used directly for neoantigen prediction. The in-silico results from OptiType, PHLAT, and HLA-HD then serve mainly as an orthogonal quality-control check on the clinical typing. Where the clinical typing is incomplete, the in-silico results are used to supplement it by filling in any missing alleles. If clinical typing is not available, the pipeline will use class I HLA alleles from Optitype, most class II HLA alleles from PHLAT, and the DPA1/DPB1/DRB3/DRB4/DRB5 alleles from HLA-HD (as PHLAT does not provide predictions for those). The consensus list used for prediction is based solely on the normal samples. However, the in-silico algorithms are run on the tumor samples. It is recommended that users use these to ensure that the normal and tumor samples are from the same individual. Users can also use these to identify any HLA alleles that have been lost (LoH) and should be avoided when prioritizing neoantigens. 
-If the clinical typing and in-silico algorithms disagree, or the in-silico algorithms disagree amongst themselves, the appropriate response depends on the type of discrepancy. For class I alleles, clinical typing supersedes OptiType, and OptiType supersedes PHLAT and HLA-HD. If the OptiType normal typing is concordant with the clinical typing but the OptiType tumor typing is discordant, this may indicate loss of heterozygosity (LOH) in the tumor. In this case, users may choose to downweight neoantigens that are predicted to bind solely to the class I allele absent from the tumor. For class II alleles, clinical typing supersedes PHLAT and HLA-HD; however, there is no clear hierarchy between PHLAT and HLA-HD themselves. Therefore, in case of disagreement, it is recommended to downweight the questionable alleles. While discrepancies are more common in class II alleles than class I, they usually do not affect the vaccine design as the candidates are primarily selected based on their class I binding, presentation, and immunogenicity properties.
-NOTE: A discrepancy between the tumor and normal samples at the first field (allele-group), or across several alleles points to a possible sample mix-up. In that case, do not proceed with the design until new samples or data have been obtained.
+Clinical HLA typing is strongly preferred and, when available, is used directly for 
+neoantigen prediction. The in-silico results from OptiType, PHLAT, and HLA-HD then 
+serve mainly as an orthogonal quality-control check on the clinical typing. Where the 
+clinical typing is incomplete, the in-silico results are used to supplement it by 
+filling in any missing alleles. If clinical typing is not available, the pipeline will 
+use class I HLA alleles from Optitype, most class II HLA alleles from PHLAT, and the 
+DPA1/DPB1/DRB3/DRB4/DRB5 alleles from HLA-HD (as PHLAT does not provide predictions for 
+those). The consensus list used for prediction is based solely on the normal samples. 
+However, the in-silico algorithms are run on the tumor samples. It is recommended that 
+users use these to ensure that the normal and tumor samples are from the same individual. 
+Users can also use these to identify any HLA alleles that have been lost (LoH) and should 
+be avoided when prioritizing neoantigens. 
+
+If the clinical typing and in-silico algorithms disagree, or the in-silico algorithms disagree 
+amongst themselves, the appropriate response depends on the type of discrepancy. For class I 
+alleles, clinical typing supersedes OptiType, and OptiType supersedes PHLAT and HLA-HD. If the 
+OptiType normal typing is concordant with the clinical typing but the OptiType tumor typing is 
+discordant, this may indicate loss of heterozygosity (LOH) in the tumor. In this case, users may 
+choose to downweight neoantigens that are predicted to bind solely to the class I allele absent 
+from the tumor. For class II alleles, clinical typing supersedes PHLAT and HLA-HD; however, there 
+is no clear hierarchy between PHLAT and HLA-HD themselves. Therefore, in case of disagreement, 
+it is recommended to downweight the questionable alleles. While discrepancies are more common in 
+class II alleles than class I, they usually do not affect the vaccine design as the candidates 
+are primarily selected based on their class I binding, presentation, and immunogenicity properties.
+
+NOTE: A discrepancy between the tumor and normal samples at the first field (allele-group), 
+or across several alleles points to a possible sample mix-up. In that case, do not proceed with 
+the design until new samples or data have been obtained.
 
 **Review multi-algorithm support for strong binding affinity**
-We are often using the “lowest” score method to prioritize candidates (the other, more
-conservative option would be “median”). This means the peptide with the lowest IC 50 from
-*any* algorithm. This leads to more candidates but can lead to the situation where a peptide is
-nominated and most algorithms actually predict that it is a poor binder and a minority of
-algorithms (perhaps only one) predict that it is a strong binder. In those cases, is the candidate
-still acceptable? Is there another peptide where the best score was slightly higher but there is
-better agreement across algorithms?
-○ MHCnuggets has often been observed to be an outlier. If only this algorithm suggests a
+We are often using the “median” score method to prioritize candidates. The other, less
+conservative option would be “lowest” score method. This means the peptide with the lowest 
+IC 50 from *any* algorithm. This leads to more candidates but can lead to the situation 
+where a peptide is nominated and most algorithms actually predict that it is a poor candidate 
+and a minority of algorithms (perhaps only one) predict that it is a strong binder. 
+In those cases, is the candidate still acceptable? Is there another peptide where the best 
+score was slightly higher but there is better agreement across algorithms?
+
+- MHCnuggets has often been observed to be an outlier. If only this algorithm suggests a
 peptide is a strong binder, these candidates should probably be failed in review.
-○ NetMHCPan and MHCFlurry have been reported by some benchmarking exercises as
+- NetMHCPan and MHCFlurry have been reported by some benchmarking exercises as
 among the better performing algorithms
-○ In cases where binding algorithms have high disagreement, additional weight should be
+- In cases where binding algorithms have high disagreement, additional weight should be
 given to presentation algorithms trained on peptide-elution mass spectrometry data
 
 **Compare variant results to another list of orthogonal variants**
 
-In some cases you might know other variants you are expecting to find in your data. If you specify that variant file in your YAML for your pipeline runs, check if the variant was also called by the ImmunoNX
-pipeline. This status is automatically provided in the “VALIDATED” column in the
-`variants.final.annotated.tsv` file produced by the ImmunoNX pipeline. The orthogonal variants validation status is
-also automatically incorporated into the Neoantigen Candidates review spreadsheet.
+In some cases you might know other variants you are expecting to find in your data. 
+If you specify that variant file in your YAML for your pipeline runs, check if the 
+variant was also called by the ImmunoNX pipeline. This status is automatically provided 
+in the “VALIDATED” column in the `variants.final.annotated.tsv` file produced by the 
+ImmunoNX pipeline. The orthogonal variants validation status is also automatically 
+incorporated into the Neoantigen Candidates review spreadsheet.
 
 ### IGV Review
 
-You can SMB mount to obtain access to the case data files on your local computer and create
+You can configure remote access to the case data files on your local computer and create
 an IGV session with the following 6 components in order:
 1. Final somatic variant VCF from ImmunoNX pipeline (annotated.expression.vcf.gz)
 2. Normal exome DNA alignments (normal.cram)
@@ -791,7 +822,7 @@ was run with the proximal variants option. The definition of “nearby” for th
 proximal variants review is any variant capable of impacting either the predicted class I
 epitope sequence (8-11 amino acids), the class II epitope sequence (12-18 amino acids)
 or the long peptide sequence that will be used for DNA/RNA vector or peptide
-sequencing (35-50 amino acids). If a variant is NOT near the edge of an exon, the
+sequencing (25-50 amino acids). If a variant is NOT near the edge of an exon, the
 proximal space to review may be up to 75 bp in either direction (potentially longer for a
 frameshift variant). If the variant is near the edge of an exon, the proximal space to
 review can be much larger as adjacent exons may be separated by large introns.
@@ -806,13 +837,16 @@ extracted from is actually expressed. Does the RNA-seq data support the expected
 nearby exon-exon junctions? Is there evidence for alternative splicing that might
 influence expression of the mutant allele or the structure of the transcript that expresses
 it (possibly impacting the presumed peptide sequence)? When performing this review
-the following IGV display settings are useful: (1) “View as pairs” and (2) “Color
+the following IGV display settings are recommened: (1) “View as pairs” and (2) “Color
 alignments by” -> “first-of-pair strand”. Note that to perform the transcript isoform review,
 it will be necessary to load the correct Ensembl GTF of transcripts in IGV. 
 
 ## Long Peptide Extraction and Final Report Generation
 
-Using the selected transcript, extract 51-mer peptide sequences that contain the candidate neoantigen. Annotate this sequence with the "best" class-I and class-II binding peptides. The selection of long peptide sequences should reflect the final conclusion of the ITB review and genomics review.
+Using the selected transcript, extract 51-mer peptide sequences that contain the candidate 
+neoantigen. Annotate this sequence with the "best" class-I and class-II binding peptides. 
+The selection of long peptide sequences should reflect the final conclusion of the ITB 
+review and genomics review.
 
 Use `pvacseq create_peptide_ordering_form` to create a fasta file that has the long peptide sequences needed.
 These files are useful in the manual review process.
@@ -857,9 +891,10 @@ exit
 
 ### 1. Peptide Fasta
 
-A plain text fasta file with each peptide sequence. This will be used for final blast checks and can be used with Pepstats to obtain molecular weights for each peptide for the ordering form.
+A plain text fasta file with each peptide sequence. This can be used for final blast check 
+and can be used with Pepstats to obtain molecular weights for each peptide for the ordering form.
 
-1. Note that if any changes to peptides are made manually during the genomics review(e.g. to select a different reference transcript, or to correct for a complex variant or proximal variant), this file must be updated to have a one-to-one relationship with the Long Peptides Spreadsheet.
+1. Note that if any changes to peptides are made manually during the genomics review (e.g. to select a different reference transcript, or to correct for a complex variant or proximal variant), this file should be updated to have a one-to-one relationship with the Long Peptides Spreadsheet.
 2. The starting point for this file is the `annotated_filtered.vcf-pass-51mer.fa` file produced by the `pvacseq generate_protein_fasta` tool described above.
    
    Example location: `$case/generate_protein_fasta/candidates/annotated_filtered.vcf-pass-51mer.fa`
