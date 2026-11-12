@@ -14,30 +14,30 @@ local system and cloud resources will be cleaned up.
 Some steps are run within docker containers. It therefore requires that you can run interactive docker sessions on your system.
 
 You will interact with the Google Cloud in several ways:
-1. From the local system using command line tools, such as  `gcloud`.
+1. From the local system using command line tools, such as `gcloud`.
 2. We will create a Google Virtual Machine (VM) and start a Cromwell service on it. You will then login to this VM and perform some commands and monitor workflow progress there. Cromwell on this VM will orchestrate the creation and use of many additional worker VMs that complete all the compute heavy tasks of the workflow.
-3. The Google Cloud Console in your web browser may be used to visualize/monitor the usage of cloud resources. In the Console, you will see the most relevant resources in the "Cloud Storage" and "Compute Engine" sections.
+3. The Google Cloud Console in your web browser may be used to visualize/monitor the usage of cloud resources. In the Console, you will see the most relevant resources in the "Cloud Storage" and "Compute Engine" sections ("IAM & Admin", "VPC Network", and "Billing" are also relevant).
 
 This version assumes that you are staging your input data files from your local system (e.g. a laptop, but could be any system really). All input files will be staged to a Google Storage Bucket. During the workflow, all results files will also be stored in this Bucket. At the end of the tutorial the final results will be copied back to your local system.
 
-After completing the workflow, ALL resources used on the cloud can be destroyed. One possible exception to this may occur if you need custom reference files that you wish to persist for many analyses. 
+After completing the workflow, ALL resources used on the cloud can be destroyed. One possible exception to this may occur if you need custom reference files that you wish to persist for many analyses (or if you wish to use Google Cloud buckets as your long term storage location for final results). 
 
 A brief note on command line sessions. Almost everything below will occur at the command line. It is very easy to get confused about the kind of sessions used. There are three types that will be used:
-1. A terminal session on your local system (e.g. using the Terminal App on a Mac laptop)
-2. Within session (1) you may launch a docker interactive session (via `docker run -it`) to use tools we have created for setting up the workflow
+1. A terminal session on your local system (e.g. using the Terminal App on a Mac laptop).
+2. Within session (1) you may launch a docker interactive session (via `docker run -it`) to use tools we have created for setting up the workflow.
 3. Within session (1) you may login (via `gcloud compute ssh`) to the Google Virtual Machine where Cromwell is running.
 
 ### Source of instructions
-This tutorial is an example of how to run a specific pipeline (immuno) on a specific example dataset (HCC1395 Tumor/normal cell line pair). The steps below are taken from the following link where you will find a more generic set of documentation that explains in detail how to run any WDL pipeline on the Google Cloud using tools created to assist this process. 
+This tutorial is an example of how to run a specific pipeline (immuno.wdl) on a specific example dataset (HCC1395 Tumor/normal cell line pair). The steps below are taken from the following link where you will find a more generic set of documentation that explains in detail how to run any WDL pipeline on the Google Cloud using tools created to assist this process. 
 https://github.com/griffithlab/cloud-workflows/tree/main/manual-workflows
 
 ### Prerequisites
-- docker
-- google-cloud-sdk
-- git
+- [docker](https://docs.docker.com/engine/install/)
+- [google-cloud-sdk](https://docs.cloud.google.com/sdk/docs/install-sdk)
+- [git](https://git-scm.com/install/)
 
 ### Example data set and analysis to be performed
-To demonstrate an analysis on the Google cloud we will run the WASHU immunogenomics pipeline on a publicly available set of exome and bulk RNA-seq data generated for a tumor/normal cell line pair (HCC1395 and HCC1395/BL). The HCC1395 cell line is a well known breast cancer cell line that can be purchased and is commonly used for benchmarking cancer genomics analysis and methods development. The datasets we will use here are realistic deeply sequenced exome and RNA-seq data. The immunogenomics pipeline is a very elaborate end-to-end pipeline that starts with raw data and performs data QC, germline variant calling, somatic variant calling (multiple variant callers and variant types), HLA typing, RNA expression analysis and neoantigen identification.  
+To demonstrate an analysis on the Google cloud we will run the WASHU immunogenomics pipeline on a publicly available set of exome and bulk RNA-seq data generated for a tumor/normal cell line pair (HCC1395 and HCC1395/BL). The HCC1395 cell line is a well known breast cancer cell line that can be purchased and is commonly used for benchmarking cancer genomics analysis and methods development. The datasets we will use here are realistic, deeply sequenced exome and RNA-seq data. The immunogenomics pipeline is a very elaborate end-to-end pipeline that starts with raw data and performs data QC, germline variant calling, somatic variant calling (multiple variant callers and variant types), HLA typing, RNA expression analysis and neoantigen identification.
 
 ### Setting up a Google Cloud account
 In order to do analysis on the Google Cloud, you will need an account. Ideally this will be an account linked to your institution/company. Before proceeding, you should set up this account, log into it and make sure you have access to billing information: https://console.cloud.google.com/.
@@ -48,17 +48,29 @@ Some notes on account setup once you are logged in:
 - Choose a name for the Google bucket that will be used for this tutorial. Note that you don't need to create it in the console because this will be handled automatically for you below. We will use the bucket name 'test-immuno-pipeline' below.
  
 Some notes on quotas:
-- If you have not been using your account for high-performance computing, it is likely that the quotas in place will cause the very large immuno.wdl workflow to fail. For example, you may not be able to use enough CPUs, IP addresses and disk space at once to get the workflow to run. If you see errors that mention quotas, or sound like fundamental network failures, check your quotas in the Google Cloud Console (IAM & Admin -> Quotas) and work with your Google account contact to increase your quotas. If your institution has already been using Google Cloud in any serious way, this is less likely to be a problem.
+- If you have not been using your account for high-performance computing, it is possible that the quotas in place will cause the very large immuno.wdl workflow to fail. For example, you may not be able to use enough CPUs, IP addresses and disk space at once to get the workflow to run. If you see errors that mention quotas, or sound like fundamental network failures, check your quotas in the Google Cloud Console (IAM & Admin -> Quotas), request increases, and work with your Google account contact to increase your quotas if increases are denied. If your institution has already been using Google Cloud in any serious way, this is less likely to be a problem.
 - Additional information about setting quotas is provided below.
 
-Example quotas you might need to request:
+Example minimal quotas you might need to request:
 - `cpus` -> `us-central1` -> `100`
 - `preemptible_cpus` -> `us-central1` -> `100`
 - `In-use IP addresses` -> `us-central1` -> `25`
 - `Persistent Disk SSD (GB)` -> `us-central1` -> `10 TB`
 
 ### Data governance and security
-Users are responsible for compliance with their local requirements and should consult their institutional, legal and compliance teams when executing this pipeline on sensitive patient data. Here, we describe the measures used in our deployment of ImmunoNX for reference. Institutional use of cloud resources is governed by a Business Associates Agreement established through a cloud services reseller. Network access to compute instances is restricted to SSH connections from institution-controlled IP addresses (resources.sh). Compute resources are transient, provisioned only for the duration of case processing. Sequencing data is held in private cloud storage buckets on which public access protection (PAP) is set automatically during setup (resources.sh). User access uses federated authentication managed by the institution, and project-scoped Identity and Access Management (IAM) permissions provide granular control of user privileges. Cloud resources accessed through institutional accounts are subject to institutional security monitoring, including threat and vulnerability detection platforms (e.g., Orca).
+Users are responsible for compliance with their local jurisdiction data security/privacy 
+requirements and should consult their institutional, legal and compliance teams when 
+executing this pipeline on patient data. Here, we describe the measures used in our 
+deployment of ImmunoNX for reference. Institutional use of cloud resources is governed 
+by a Business Associates Agreement established through a cloud services reseller. Network 
+access to compute instances is restricted to SSH connections from institution-controlled 
+IP addresses (resources.sh). Compute resources are transient, provisioned only for the 
+duration of case processing. Sequencing data is held in private cloud storage buckets on 
+which public access protection (PAP) is set automatically during setup (resources.sh). User 
+access uses federated authentication managed by the institution, and project-scoped Identity 
+and Access Management (IAM) permissions provide granular control of user privileges. Cloud 
+resources accessed through institutional accounts are subject to institutional security 
+monitoring, including threat and vulnerability detection platforms (e.g., Orca, Crowdstrike, etc.).
 
 ### Setup Reminders for New Users
 
@@ -104,7 +116,7 @@ You should see `billingEnabled: true` in the output before proceeding.
 #### 3. Enable Required APIs
 
 Google Cloud requires you to explicitly enable APIs before using them. 
-For this pipeline, the Compute Engine API must be enabled — this allows 
+For this pipeline, the Compute Engine API must be enabled. This allows 
 your project to create and manage virtual machines (VMs), which Cromwell 
 uses to run each step of the pipeline. Without this, no worker VMs can 
 be created and the pipeline will not run.
@@ -179,12 +191,15 @@ bash resources.sh init-project \
 
 **Understanding your options:**
 
-- `--ip-range 0.0.0.0/0` — Allows SSH access from any IP address. This is 
+- `--ip-range 0.0.0.0/0` - Allows SSH access from any IP address. This is 
   the simplest option and is acceptable for a short-lived test run, but is 
-  less secure.
-- `--ip-range YOUR_IP/32` — Restricts SSH access to a single IP address 
-  (your own). This is the more secure approach and is recommended if you 
-  are working from a location with a fixed IP address such as an office or institutional network.
+  less secure and NOT recommended.
+- `--ip-range YOUR_IP/32` - Restricts SSH access to a single IP address 
+  (e.g. your own). This is the more secure approach and is recommended if you 
+  are working from a location with a fixed IP address such as an office 
+  or institutional network.
+- `--ip-range CIDR_IP_STRING` - Restrict SSH access to a range of IP address (e.g. 
+   a list assigned to your institution) using a comma-seperated list of IPs/CIDRs.
 
 To find your current public IP address:
 
@@ -202,7 +217,7 @@ bash resources.sh init-project \
 ```
 
 > **Note:** If you are working from multiple locations (e.g. home and 
-> office) or your IP address changes, you can specify a broader range 
+> office) or your IP address changes, you can also update or specify a broader range 
 > (e.g. your institution's subnet) or update the firewall rules in the 
 > Google Cloud Console under **VPC Network → Firewall**.
 
@@ -218,8 +233,14 @@ To set your default zone:
 gcloud config set compute/zone us-central1-c
 ```
 
+Note that for performance and cost reasons you want your Cromwell VM and compute task VMs,
+to be in the same region. And similarly, for performance and cost reasons it is 
+preferrable for the cloud bucket to be single region as opposed to multi-region. 
+The resource setup scripts and instructions below should automatically configure 
+the environment this way.
+
 ### Interacting with Google buckets from your local system
-Note that, if needed, you can use the following docker image to access `gcloud storage` for exploration of your google storage: `docker(google/cloud-sdk)`. Or alternatively, you can install the Google Cloud SDK on your system. The following instructions assume the latter.
+Note that, if needed, you can use the following docker image to access `gcloud storage` for exploration of your google storage: `docker(google/cloud-sdk)`. Or alternatively, you can install the [Google Cloud SDK](https://docs.cloud.google.com/sdk/docs/install-sdk) on your system. The following instructions assume the latter.
 
 ## Step-by-step instructions
 Start by opening a Terminal session on your local system
@@ -246,14 +267,25 @@ NOTE: You will need to manually create the Google billing project in the console
 ## Local setup
 
 ### First create a working directory on your local system
-The following directory on the local system will contain: (a) a git repository for this tutorial including an example YAML file set up to work with the test HCC1395 data, (b) git repository for the WDL workflows, including the immuno workflow, (c) git repository for tools that help provision and manage our workflow runs on the cloud, (d) raw data that we will download for this tutorial, (e) a YAML file describing the input data and parameters for the analysis, and (f) final results file from the workflow that we will pull down from the cloud after a successful run.
+The following directory on the local system will contain: (a) a git repository for this tutorial 
+including an example YAML file set up to work with the test HCC1395 data, (b) git repository for 
+the WDL workflows, including the immuno workflow, (c) git repository for tools that help provision 
+and manage our workflow runs on the cloud, (d) raw data that we will download for this tutorial, 
+(e) a YAML file describing the input data and parameters for the analysis, and (f) final results 
+files from the workflow that we will pull down from the cloud after a successful run.
 ```bash
 mkdir -p $WORKING_BASE
 cd $WORKING_BASE
 ```
 
 ### Clone git repositories that have the workflows (pipelines) and scripts to help run them
-The following repositories contain: this tutorial (immunoNX), the WDL workflows (analysis-wdls), and tools for running these on the cloud (cloud-workflows). Note that the command below will clone the branch of each repo that was tested and verified to work for this tutorial. If you would like to keep up with our latest updates, the release branches can be found at the respective GitHub repositories. Note that the analysis-wdls repository cloned at this step is only for record keeping. The version used by the pipeline itself depends on the cloud-workflows repository.
+The following repositories contain: this tutorial ([immunoNX](https://github.com/griffithlab/ImmunoNX_protocol)), the WDL workflows ([analysis-wdls](https://github.com/wustl-oncology/analysis-wdls)), 
+and tools for running these on the cloud ([cloud-workflows](https://github.com/wustl-oncology/cloud-workflows)). 
+Note that the command below will clone the branch of each repo that was tested and 
+verified to work for this tutorial. If you would like to keep up with our latest updates, 
+the release branches can be found at the respective GitHub repositories. Note that the 
+analysis-wdls repository cloned at this step is only for record keeping. The version used 
+by the pipeline itself depends on the cloud-workflows repository.
 ```bash
 mkdir git
 cd git
@@ -266,7 +298,16 @@ git clone --branch v1.8.1 https://github.com/wustl-oncology/cloud-workflows.git
 ```
 
 ### Login to GCP and set the desired project
-From the command line, you will need to authenticate your cloud access (using your google cloud account credentials). This generally only needs to be done once, though there is no harm to re-authenticating. The login command below will generate a custom URL to enter in your browser. Once you do this, you will be prompted to log into your Google account. If you have multiple Google accounts (e.g. one for your institution/company and a personal one) be sure to use the correct one.  Once you have logged in you will be presented with a long code. Enter this at the prompt generated by the login command below. Finally, set your desired Google Project. This Project should correspond to a Google Billing account in the Google console. If you are using Google Cloud for the first time, both billing and a project should be set up before proceeding. Configuring billing alerts is also wise at this point.
+From the commandline, you will need to authenticate your cloud access (using your google 
+cloud account credentials). This generally only needs to be done once (until it expires), 
+though there is no harm to re-authenticating. The login command below will generate a 
+custom URL to enter in your browser. Once you do this, you will be prompted to log into 
+your Google account. If you have multiple Google accounts (e.g. one for your institution/company 
+and a personal one) be sure to use the correct one. Once you have logged in you will be 
+presented with a long code. Enter this at the prompt generated by the login command below. 
+Finally, set your desired Google Project. This Project should correspond to a Google Billing 
+account in the Google console. If you are using Google Cloud for the first time, both billing 
+and a project should be set up before proceeding. Configuring billing alerts is also wise at this point.
 ```bash
 gcloud auth login
 gcloud config set project $GCS_PROJECT
@@ -274,14 +315,19 @@ gcloud config list
 ```
 
 ### Set up cloud service account, firewall settings, and storage bucket
-Run the following command and make note of the "Service Account" returned (e.g. "cromwell-server@test-immuno.iam.gserviceaccount.com"). Make sure this matches the value in $GCS_SERVICE_ACCOUNT (e.g. `echo $GCS_SERVICE_ACCOUNT`). If the project already exists you will see errors but as long as the Service Account is returned then everything has executed correctly. 
+Run the following command and make note of the "Service Account" returned 
+(e.g. "cromwell-server@test-immuno.iam.gserviceaccount.com"). Make sure 
+this matches the value in $GCS_SERVICE_ACCOUNT (e.g. `echo $GCS_SERVICE_ACCOUNT`). 
+If the project already exists you will see errors but as long as the Service 
+Account is returned then everything has executed correctly. 
 
 ```bash
 cd $WORKING_BASE/git/cloud-workflows/manual-workflows/
-bash resources.sh init-project --project $GCS_PROJECT --bucket $GCS_BUCKET_NAME # you may have to specify ip addresses depending on google cloud bucket permissions
+bash resources.sh init-project --project $GCS_PROJECT --bucket $GCS_BUCKET_NAME --ip-range [YOUR_IP/32]
 ```
 
-This step should have created two new configuration files in your current directory: `cromwell.conf` and `workflow_options.json`.
+This step should have created two new configuration files in your current directory: 
+`cromwell.conf` and `workflow_options.json`.
 
 ### Download input data files
 
@@ -299,7 +345,10 @@ rm -f Exome_Norm.tar Exome_Tumor.tar RNAseq_Tumor.tar
 ```
 
 ### Create a copy of reference and annotation files in your Google Bucket
-You may either make a set of reference files using instructions provided in the `Preparing_references.md` document. If you want to use our group's references, you can make a copy of a bundle of reference files from our Public ("Requestor Pays") Google Bucket to your own Google Bucket as follows:
+You may either make a set of reference files using instructions provided in the 
+`Preparing_references.md` document. If you want to use our group's references, you 
+can make a copy of a bundle of reference files from our Public ("Requestor Pays") 
+Google Bucket to your own Google Bucket as follows:
 
 ```bash
 gcloud storage ls gs://griffith-lab-workflow-inputs/ --billing-project=[Google Project]
@@ -309,7 +358,9 @@ gcloud storage ls $GCS_BUCKET_PATH/human_GRCh38_ens105
 ```
 
 ### Obtain an example configuration (YAML) file on local system
-Create a directory for YAML files and in that, create a YAML file that points to the location of input files on your local system. In this case, the local YAML file should point to the locations that the raw hcc1395 data was downloaded to.
+Create a directory for YAML files and in that, create a YAML file that points to the 
+location of input files on your local system. In this case, the local YAML file should 
+point to the locations that the raw hcc1395 data was downloaded to.
 
 ```bash
 cd $WORKING_BASE
@@ -317,21 +368,41 @@ mkdir yamls
 cd yamls
 ```
 
-Setup YAML files for the example run. Copy the template YAML file in this repository and rename it based on the previously described environment labels.
+Setup YAML files for the example run. Copy the template YAML file in this repository 
+and rename it based on the previously described environment labels.
 ```bash
 cp $WORKING_BASE/git/ImmunoNX_protocol/example_yamls/template_immuno_local-WDL.yaml $WORKING_BASE/yamls/
 mv $WORKING_BASE/yamls/template_immuno_local-WDL.yaml $WORKING_BASE/yamls/$LOCAL_YAML
 ```
 
-Note that this YAML file has been set up to work with the HCC1395 raw data files downloaded above. You will need to update the PATHs to the FASTQ files by adding filepaths to match the locations where data was downloaded. You will also need to replace `[path to reference folder]` in the YAML to match the location of your newly created/copied reference directory. 
+Note that this YAML file has been set up to work with the HCC1395 raw data files downloaded above. 
+You will need to update the PATHs to the FASTQ files by adding filepaths to match the locations 
+where data was downloaded. You will also need to replace `[path to reference folder]` in the YAML 
+to match the location of your newly created/copied reference directory. 
 
-If you are modifying this tutorial to work with your own data, you will need to modify the YAML lines that relate to input sequence files.  For both DNA and RNA files, both FASTQ and Unaligned BAM files are supported as input.  Similarly, you may have your data in one pair of files or multiple pairs of files that will be merged together. Depending on how your input data is organized the YAML entries will look slightly different.
+If you are modifying this tutorial to work with your own data, you will need to modify the YAML lines 
+that relate to input sequence files.  For both DNA and RNA files, both FASTQ and Unaligned BAM files 
+are supported as input.  Similarly, you may have your data in one pair of files or multiple pairs of 
+files that will be merged together. Depending on how your input data is organized the YAML entries 
+will look slightly different.
 
 ### Stage input data files to cloud bucket
 
-The reference and annotation files should already be in your Google Bucket. However, the input FASTQ data files are still only on your local system, so we need to upload them and update our YAML file to point to their new locations on the cloud.
+The reference and annotation files should already be in your Google Bucket. 
+However, the input FASTQ data files are still only on your local system, 
+so we need to upload them and update our YAML file to point to their new 
+locations on the cloud.
 
-Start an interactive docker session capable of running the "cloudize" scripts. Note that the following docker command uses `--env` commands to pass some convenient environment variables in that were exported above. The first `-v` option is used to allow access to where the data is stored. The second `-v` is used to expose the location of the Google Cloud Credential files.  You will need to update this to reflect your username. The `-it` option is used to make the session interactive and helps us drop into a `/bin/bash` session. The `mgibio/cloudize-workflow:v1.8.1` docker image has the helper scripts we need to upload files to the Google Bucket and make the new YAML file.
+Start an interactive docker session capable of running the "cloudize" scripts. 
+Note that the following docker command uses `--env` commands to pass some 
+convenient environment variables in that were exported above. The first `-v` 
+option is used to allow access to where the data is stored. The second `-v` 
+is used to expose the location of the Google Cloud Credential files.  
+You may need to update this to reflect your username if "~" does not resolve 
+it on your system. The `-it` option is used to make the session interactive 
+and helps us drop into a `/bin/bash` session. The `mgibio/cloudize-workflow:v1.8.1` 
+docker image has the helper scripts we need to upload files to the Google 
+Bucket and make the new YAML file.
 
 ```bash
 docker pull mgibio/cloudize-workflow:v1.8.1
@@ -344,13 +415,40 @@ cd $WORKING_BASE/yamls
 python3 /opt/scripts/cloudize-workflow.py $GCS_BUCKET_NAME $WORKFLOW_DEFINITION $WORKING_BASE/yamls/$LOCAL_YAML --output=$WORKING_BASE/yamls/$CLOUD_YAML
 ```
 
-Note that this "cloudize" step is primarily about staging input files that you may have locally on your system that need to be copied to a google cloud bucket so that they can be accessed during your workflow run on the cloud. It therefore takes the desired Google Cloud Bucket Name as input. It also takes the appropriate Workflow Definition (WDL) pipeline file.  It will perform some basic checks of the input expectations of this workflow against the input YAML configuration file you provide. The local YAML configuration file you updated above is the input for this command. This should contain all the input parameters needed by your workflow, including paths to reference, annotation and data files. If any of the file paths in your input YAML are local paths, this script will attempt to copy them into your bucket. If a file path is already specified as a Google Cloud Bucket path (e.g. gs://PATH ) it will be skipped. The output of the script (the Cloud YAML), is a version of your YAML that has been updated to point to new paths for any files that were copied into the cloud bucket. This Cloud YAML will be used to launch your workflow run in the following steps.
+Note that this "cloudize" step is primarily about staging input files that you 
+may have locally on your system that need to be copied to a google cloud 
+bucket so that they can be accessed during your workflow run on the cloud. It 
+therefore takes the desired Google Cloud Bucket Name as input. It also takes 
+the appropriate Workflow Definition (WDL) pipeline file. It will perform some 
+basic checks of the input expectations of this workflow against the input YAML 
+configuration file you provide. The local YAML configuration file you updated 
+above is the input for this command. This should contain all the input parameters 
+needed by your workflow, including paths to reference, annotation and data files. 
+If any of the file paths in your input YAML are local paths, this script will 
+attempt to copy them into your bucket. If a file path is already specified as 
+a Google Cloud Bucket path (e.g. gs://PATH ) it will be skipped. The output of 
+the script (the Cloud YAML), is a version of your YAML that has been updated 
+to point to new paths for any files that were copied into the cloud bucket. 
+This Cloud YAML will be used to launch your workflow run in the following steps.
 
-If you get an error during this step, a common cause is that there is some disconnect between what inputs you have defined in your YAML file and what the WDL workflow definition expects. Often the error message will hint at where to look in these two files. You should also look through the Cloud YAML file at this step to ensure that all the filepaths pointing to the local data have been updated to `gs://` filepaths, and the files are uploaded to your Google Bucket. If there are filepaths that did not get updated, that may point to an incorrect filepath that needs to be corrected.
+If you get an error during this step, a common cause is that there is some 
+disconnect between what inputs you have defined in your YAML file and what 
+the WDL workflow definition expects. Often the error message will hint at 
+where to look in these two files. You should also look through the Cloud 
+YAML file at this step to ensure that all the filepaths pointing to the local 
+data have been updated to `gs://` filepaths, and the files are uploaded to 
+your Google Bucket. If there are filepaths that did not get updated, that 
+may point to an incorrect filepath that needs to be corrected.
 
 ### Start a Google VM that will run Cromwell and orchestrate completion of the workflow
 
-Note that Cromwell produces a large quantity of database logging. To ensure we have enough space for at least a few runs and to localize intermediate and final results files from the workflow (which include numerous large BAMs) we will specify some extra disk space with `--boot-disk-size=250GB` (default would be 10GB). When not testing, this can probably be safely reduced to 20-40GB. Note that this argument must be listed last after the required arguments for the `start.sh` script.
+Note that Cromwell produces a large quantity of database logging. To ensure 
+we have enough space for at least a few runs and to localize intermediate 
+and final results files from the workflow (which include numerous large BAMs) 
+we will specify some extra disk space with `--boot-disk-size=250GB` (default 
+would be 10GB). When not testing, this can probably be safely reduced to 20-40GB. 
+Note that this argument must be listed **last** after the required arguments for 
+the `start.sh` script.
 ```bash
 cd $WORKING_BASE/git/cloud-workflows/manual-workflows/
 bash start.sh $GCS_INSTANCE_NAME --analysis-release=1.4.0 --cromwell-version=92 --server-account $GCS_SERVICE_ACCOUNT --project $GCS_PROJECT --boot-disk-size=250GB
@@ -362,11 +460,14 @@ exit
 
 ### Log into the VM and check status 
 
-In this step we will confirm that we can log into our Cromwell VM with `gcloud compute ssh` and make sure it is ready for use.
+In this step we will confirm that we can log into our Cromwell VM with 
+`gcloud compute ssh` and make sure it is ready for use.
 
-After logging in, use `journalctl` to see if the instance start-up has completed, and cromwell launch has completed.
+After logging in, use `journalctl` to see if the instance start-up has 
+completed, and cromwell launch has completed.
 
-For details on how to recognize whether these processes have completed, refer: [here](https://github.com/griffithlab/cloud-workflows/tree/main/manual-workflows#ssh-in-to-vm).
+For details on how to recognize whether these processes have completed, 
+refer: [here](https://github.com/griffithlab/cloud-workflows/tree/main/manual-workflows#ssh-in-to-vm).
 
 ```bash
 gcloud compute ssh $GCS_INSTANCE_NAME
@@ -384,7 +485,7 @@ cd $WORKING_BASE/yamls/
 gcloud storage cp $CLOUD_YAML $GCS_BUCKET_PATH/yamls/$CLOUD_YAML
 ```
 
-Now log into Google Cromwell VM instance again and copy the YAML file from the Google bucket to the VM.
+Now log into **Google Cromwell VM** instance again and copy the YAML file from the Google bucket to the VM.
 ```bash
 gcloud compute ssh $GCS_INSTANCE_NAME
 
@@ -403,7 +504,10 @@ source /shared/helpers.sh
 submit_workflow /shared/analysis-wdls/definitions/immuno.wdl $CLOUD_YAML > workflow_id.txt
 
 ```
-Once the workflow is submitted, it will generate a unique Workflow ID that can be used to track your run's progress. While this workflow ID can be retrieved, we recommend that you make a note of this workflow ID at this stage by saving it to a file on the VM.
+Once the workflow is submitted, it will generate a unique Workflow ID that can 
+be used to track your run's progress. While this workflow ID can be retrieved, 
+we recommend that you make a note of this workflow ID at this stage by saving 
+it to a file on the VM.
 
 ### Monitor progress of the workflow run:
 
@@ -411,13 +515,17 @@ While the job is running you can see Cromwell logs live as they occur by running
 ```bash
 journalctl -f -u cromwell
 ```
-You can also check the status of an ongoing run by querying Cromwell using the workflow ID. This should give an output of 'Running', 'Failed', or 'Succeeded'.
+You can also check the status of an ongoing run by querying Cromwell using the workflow ID. 
+This should give an output of 'Running', 'Failed', or 'Succeeded'.
 ```bash
 export WORKFLOW_ID=<id from above>
 curl http://localhost:8000/api/workflows/v1/$WORKFLOW_ID/status
 ```
 
-Note that if you have been testing and have several workflows that have been run on the same server it can get confusing to tell which workflow is which and in what order they were started. The following command will parse the cromwell log for records of workflows that were started, in order and at what time:
+Note that if you have been testing and have several workflows that have been run on the 
+same server it can get confusing to tell which workflow is which and in what order they 
+were started. The following command will parse the cromwell log for records of workflows 
+that were started, in order and at what time:
 
 ```bash
 journalctl -u cromwell | grep "Starting workflow UUID" | perl -ne 'if ($_ =~ /(\w+\s+\d+\s+\d+\:\d+\:\d+).*UUID\((\S+)\)/){print "$2\tstarted $1\n"}'
@@ -430,9 +538,15 @@ Jul 31 16:54:00 hcc1395-immuno-test java[1739]: 2025-07-31 16:54:00 cromwell-sys
 
 ### Save information about the workflow run itself - Timing Diagram and Outputs List
 
-After a workflow is run, before exiting and deleting your VM, make sure that the timing diagram and the list of outputs are available so you can make use of the data outside of the cloud.
+After a workflow is run, before exiting and deleting your VM, make sure that the 
+timing diagram and the list of outputs are available so you can make use of the 
+data outside of the cloud.
 
-First determine your WORKFLOW_ID if it was not recorded previously. This can be done in several ways. If the run was successful it should be reported at the bottom of the cromwell log as "$WORKFLOW_ID  completed with status Succeeded". Alternatively, you can find it by the name of the directory where your run was stored in the Google bucket. Both of these approaches are illustrated here:
+First determine your WORKFLOW_ID if it was not recorded previously. This can be 
+done in several ways. If the run was successful it should be reported at the 
+bottom of the cromwell log as "$WORKFLOW_ID  completed with status Succeeded". 
+Alternatively, you can find it by the name of the directory where your run was 
+stored in the Google bucket. Both of these approaches are illustrated here:
 
 ```bash
 export GCS_BUCKET_PATH=gs://test-immuno-pipeline
@@ -463,9 +577,12 @@ exit
 The file `outputs.json` is a map of output names to their GCS locations. The `pull_outputs.py` script retrieves the output files.
 
 ### Pulling the Outputs from Google Cloud Bucket back to your local system or cluster
-After the work in your Google VM is completed, including `save_artifacts`, and you want to bring your results back to the cluster, leverage the `pull_outputs.py` script with the generated `outputs.json` to retrieve the files.
+After the work in your Google VM is completed, including `save_artifacts`, and you want 
+to bring your results back to your local system, use the `pull_outputs.py` script with 
+the generated `outputs.json` to retrieve the final results files.
 
-On your local system, with the previously defined environment variables loaded, enter a docker container with the script available:
+On your local system, with the previously defined environment variables loaded, enter 
+a docker container with the script available:
 ```bash
 export WORKFLOW_ID=<id from above>
 
@@ -492,7 +609,8 @@ du -h
 
 ### Estimate the cost of executing your workflow
 
-On your local system, start an interactive docker session and then use the following python script to generate a cost estimate:
+On your local system, start an interactive docker session and then use 
+the following python script to generate a cost estimate:
 ```bash
 export WORKFLOW_ID=<id from above>
 
@@ -511,9 +629,11 @@ Use the following command to destroy the Cromwell VM.
 gcloud compute instances delete $GCS_INSTANCE_NAME
 ```
 
-You can empty the cloud bucket either in the Web Console or using commands like `gcloud storage rm -r $GCS_BUCKET_PATH/folder-name`.
+You can empty the cloud bucket either in the Web Console or using commands 
+like `gcloud storage rm -r $GCS_BUCKET_PATH/folder-name`.
 
-Finally, we recommend you perform a survey of Cloud Storage and Compute Engine sections in the Google Cloud Web Console to make sure everything has been cleaned up successfully.
+Finally, we recommend you perform a survey of Cloud Storage and Compute Engine 
+sections in the Google Cloud Web Console to make sure everything has been cleaned up successfully.
 
 
 ### Final Results File Structure and Description
