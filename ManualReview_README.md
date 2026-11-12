@@ -2,19 +2,19 @@
 
 The purpose of the immunogenomics review is to confirm that the results of the ImmunoNX pipeline are correct. This process involves checking if the output contains the correct files, reviewing quality control (QC) metrics, creating a written report, presenting results to a panel of experts, and using visualization tools: **pVACview** and **IGV**, to manually verify the neoantigen candidates. These steps help ensure that high confidence neoantigen candidates are selected.
 
-Users wishing to explore pVACview are encouraged to visit its website https://pvacview.org/ to understand its full capabilities without running the entire pipeline. The ‘Load Demo Data’ option on the home page automatically loads files from the HCC1395 example dataset described in this protocol. (Note that the website version is based on the latest pVACtools release, which may be different from the version you are using. In this case, the interface and some features may look different; however, the general functionality will be the same). 
+Users wishing to explore pVACview are encouraged to visit its demonstration website https://pvacview.org/ to explore its full capabilities without running the entire pipeline. The ‘Load Demo Data’ option on the home page automatically loads files from the HCC1395 example dataset described in this protocol. Note that the website version is based on the latest pVACtools release, which may be different from the version you are using. In this case, the interface and some features may look different; however, the general functionality will be comparable. 
 
 ## Initial review of ImmunoNX Pipeline Outputs
 
 At this stage, we mostly want to confirm that the pipeline succeeded and that transferring the
 data files into the case folder on our local server was successful. Check the total number and total
-size of files. In order to proceed, the following files must be present: tumor/normal DNA BAMs, RNA
+size of files. In order to proceed, the following files must be present: tumor/normal DNA CRAMs, tumor RNA
 BAM, annotated variants VCF for pVACseq, proximal variants VCF, annotated variants TSV,
 HLA typing results, QC report files, and pVACseq/pVACview results file.
 
 ### Creating an Immunogenomic Review Report
 
-For our vaccine clinical trials, we have found that creating a document to organize notes during the Immunogenomics Review is helpful because the review is a very manual process. These instructions outline how to create a similar report. The structure of this report also provides a roadmap to carry out the manual review of candidates. 
+For our vaccine clinical trials, we have found that creating a document to organize findings during the Immunogenomics Review is helpful because the review is a manual process. These instructions outline how to create a similar report. The structure of this report also provides a roadmap to carry out the manual review of candidates. 
 
 The structure of this report is:
 1. Introduction: a brief description of the patient's history, where the data comes from, and/or what results are expected.
@@ -25,7 +25,7 @@ The structure of this report is:
 6. Tumor type / driver variant review: What variants we expect to see and if they are known to drive tumor progression. These will be important neoantigen candidates to prioritize.
 7. Fusion review: Fusion candidates that need further review.
 8. Comparison to orthogonal variant calls: a comparison of the pipeline's variant calls to another source of variant information (if included).
-9. IGV review: This section is dedicated to the final stage for visually verifying the candidates of interest in IGV. Often this section functions as a conclusion for the immunogenomics review. It details how many candidates were reviewed, which candidates got rejected and why, and other interesting or concerning things of note from the case.
+9. IGV review: This section is dedicated to the final genomics review stage for visually verifying the candidates of interest in IGV. Often this section functions as a conclusion for the immunogenomics review. It details how many candidates were reviewed, which candidates got rejected and why, and other interesting or concerning things of note from the case.
 
 We have created several scripts to aid in the generation of these lists of metrics
 
@@ -61,7 +61,7 @@ python3 /opt/scripts/get_FDA_thresholds.py -WB  $WORKING_BASE -f final_results
 <img width="589" height="680" alt="Example Mock FDA Metrics" src="https://github.com/user-attachments/assets/dcdad32c-aede-4a8f-8517-d272dace263b" />
 
 >[!WARNING]
-> Although the script is called `get_FDA_thresholds.py`, these are not FDA approved or verified metrics.
+> Although the script is called `get_FDA_thresholds.py`, these are not FDA approved or verified metrics (though they were developed in response to FDA information requests).
 >These are stringent thresholds which we use to verify the quality of the data.
 
 
@@ -116,7 +116,7 @@ cutoff to 25%.
 **Variant Type**
 
 Consider whether the variant is a SNV, InDel or DNV. Variants that are insertions, deletions or
-dinucleotide variants have different interpretations from the perspective of DNA and RNA VAF,
+dinucleotide variants may have different interpretations from the perspective of DNA and RNA VAF,
 reference matches, number of core binding peptides expected, etc.
 
 [**TSL (transcript support level)**](https://grch37.ensembl.org/info/genome/genebuild/transcript_quality_tags.html)
@@ -126,7 +126,7 @@ should be marked as **Review** and support for the specific transcript used to a
 predicted amino acid change should be evaluated using the tumor RNAseq data. TSL values
 greater than 1 or NA are often acceptable and simply reflect incomplete annotation of the
 transcripts of a gene (an ongoing, partially manual, curation process). It can be helpful to refer
-to the “transcript table” in Ensembl where additional annotation tiering information is available.
+to the “transcript table” in Ensembl where additional annotation tiering/flag information is available.
 For example, it is possible for a transcript to have a TSL > 1 , but for that transcript to also be
 categorized as MANE Select, GENCODE Primary or Ensembl Canonical, any one of which
 would increase confidence in the quality of the transcript annotation. A screenshot of an
@@ -147,8 +147,7 @@ column will be highlighted red) then mark the candidate as **Reject**.
 
 In past testing it has been observed that peptides containing cysteines may result in difficulties
 during synthesis, due to disulfide bond formation, or have reduced stability during storage. Thus, peptides
-containing cysteines may later fail identity/purity tests during drug product
-testing.
+containing cysteines may later fail identity/purity tests during drug product testing.
 
 For most studies using a synthetic long peptide approach for vaccine delivery, if any position in
 the core binding peptide has a cysteine, this is often a strong reason to **Reject** the candidate.
@@ -166,8 +165,7 @@ defined in the input YAML file, and this criteria can be ignored.
 This is not an **Accept** / **Reject** criterion but a larger number of passing peptides is desirable, as is
 often the case for frameshift neoantigen candidates. Note that the number of peptides reported
 as Passing in pVACview and aggregated reports depends on the thresholds selected. Relevant
-pVACtools parameters include: _- -binding-threshold_ , _- -percentile-threshold_ ,
-
+pVACtools parameters include: _- -binding-threshold_ , _- -percentile-threshold_ , 
 _- -allele-specific-binding-thresholds_ and _- -top-score-metric_.
 
 **IC50 and %ile MT (median mutant peptide binding affinity prediction)**
@@ -188,9 +186,11 @@ variant allele is strong but the gene expression was <1 TPM.
 **RNA VAF (RNA variant allele fraction)**
 
 An RNA VAF > 0 is generally required for an Accept. Higher is better. A low VAF may indicate
-sub-clonality or allele specific expression. If the RNA depth is high, the DNA VAF is acceptable
-but if the RNA VAF is low (e.g. < 5%) then Reject (evidence of allele specific expression favoring the
-wild type allele). In rare cases, exceptions may be made if: (a) the variant is a known driver, (b)
+sub-clonality or allele specific expression. If the RNA depth is high and the DNA VAF is acceptable
+but the RNA VAF is low (e.g. < 5%) then Reject (evidence of allele specific expression favoring the
+wild type allele). 
+
+In rare cases, exceptions may be made if: (a) the variant is a known driver, (b)
 the gene is expressed at a high level; or (c) the low RNA VAF may be explained by lower
 coverage for technical reasons (e.g., in a region suffering from end bias).
 
@@ -210,7 +210,7 @@ confidence that the variant was actually detected.
 If the total number of variant allele supporting RNA reads is small (e.g. < 5), IGV review should
 be used to carefully assess the quality of this small number of reads. The number of unique
 cDNA fragments supporting the variant should be examined (e.g. if the supporting RNA count is
-2 , it is possible that there is just 1 unique cDNA fragment, sequenced in both directions).
+2, it is possible that there is just 1 unique cDNA fragment, sequenced in both directions).
 
 
 In the case of small numbers of supporting RNA reads, the alignments of these reads should be
