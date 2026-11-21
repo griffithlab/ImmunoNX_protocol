@@ -18,10 +18,18 @@ BASEDIR=/path/to/annotation_data_grch38_ens113
 We will use the 1000 Genomes version of the human GRCh38 build. This reference includes 
 extra decoy and HLA sequences in addition to the alternate haplotypes provided from 
 the GRC consortium. 
+We will then mask this fasta using the GRC exclusions BED file from NCBI, which hard-masks 
+regions flagged by the GRC as problematic for alignment (replaced with N). The masked file is 
+saved as all_sequences.fa, so all of the steps below use the masked reference.
 
 ```
 mkdir -p $BASEDIR/reference_genome
-wget -O $BASEDIR/reference_genome/all_sequences.fa https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa
+# Download the reference genome and exclusions BED.
+wget -O $BASEDIR/reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/technical/reference/GRCh38_reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa
+wget -O $BASEDIR/reference_genome/GCA_000001405.15_GRCh38_GRC_exclusions.bed https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_GRC_exclusions.bed
+
+# Apply all exclusions to create the reference used throughout this guide.
+bedtools maskfasta -fi $BASEDIR/reference_genome/GRCh38_full_analysis_set_plus_decoy_hla.fa -bed $BASEDIR/reference_genome/GCA_000001405.15_GRCh38_GRC_exclusions.bed -fo $BASEDIR/reference_genome/all_sequences.fa
 ```
 
 
@@ -48,8 +56,8 @@ Download the chromAlias file from UCSC genome browser and restrict it to lines i
 
 ```
 wget -O $BASEDIR/reference_genome/chromAlias.txt.gz https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/chromAlias.txt.gz
-zgrep 'ensembl' chromAlias.txt.gz > chromAlias.ensembl.txt
-rm chromAlias.txt.gz
+zgrep 'ensembl' $BASEDIR/reference_genome/chromAlias.txt.gz > $BASEDIR/reference_genome/chromAlias.ensembl.txt
+rm $BASEDIR/reference_genome/chromAlias.txt.gz
 ```
 
 ## Ensembl/VEP annotation files
@@ -104,7 +112,7 @@ cat $BASEDIR/rna_seq_annotation/Homo_sapiens.GRCh38.cdna.all.fa.gz $BASEDIR/rna_
 
 The human genome reference sequence must be indexed for efficient searching by the bwa-mem alignment algorithm. This index should be created by the same version of bwa-mem that will be used for alignment. 
 
-From docker image: `mgibio/alignment_helper-cwl:2.1.1`
+From docker image: `mgibio/alignment_helper-cwl:2.2.1`
 
 ```
 mkdir -p $BASEDIR/aligner_indices/bwamem_0.7.15 
@@ -164,6 +172,7 @@ This command downloads the V3 of the genome [Gnomad Database](https://gnomad.bro
 ```
 #Download gnomad V3 VCFs for each chromosome, concatenate, and filter to AF>0.001.
 mkdir $BASEDIR/known_variants/gnomad_temp
+cd $BASEDIR/known_variants/gnomad_temp
 # Step 1: Download VCFs
 for chr in {1..22} X Y; do
   wget https://ftp.ensembl.org/pub/data_files/homo_sapiens/GRCh38/variation_genotype/gnomad/v3.1.2/gnomad.genomes.v3.1.2.sites.chr${chr}_trimmed_info.vcf.bgz
